@@ -3,6 +3,7 @@ package main
 import (
   "fmt"
   "flag"
+  "time"
   "./hbci"
   "strconv"
   "strings"
@@ -11,6 +12,7 @@ import (
   "encoding/base64"
   "github.com/golang/glog"
   "github.com/dchest/uniuri"
+  "github.com/fzzy/radix/redis"
 )
 
 type MessageContext struct {
@@ -104,8 +106,26 @@ func ParseIncomingMessage(message string) (MessageContext, error) {
       }
       msgContext.Pin = dataElems[3]
       glog.Infof("Signed with PIN %s", msgContext.Pin)
-      // TODO: Check if PIN of the user candidate from earlier on is matching
-      if msgContext.UserId != "USER" || msgContext.Pin != "PIN1234" {
+
+      c, err := redis.DialTimeout("tcp", "127.0.0.1:6379", time.Duration(10)*time.Second)
+      if err != nil {
+        glog.Fatalf("(Auth) Cannot connect to redis: %s", err)
+        seg := fmt.Sprintf("HIRMG:%d:2+9050::Can not connect to persistence backend'", len(responseSegments)+2)
+        responseSegments = append(responseSegments, seg)
+        break
+      }
+
+      c.Cmd("select", 0)
+
+      result, err := c.Cmd("get", msgContext.UserId).Str()
+      if err != nil {
+        glog.Warningf("(Auth) Cannot read from redis: %s", err)
+        seg := fmt.Sprintf("HIRMS:%d:2+9931:%s:Invalid Login'", len(responseSegments)+2, segHead[1])
+        responseSegments = append(responseSegments, seg)
+        break
+      }
+
+      if msgContext.Pin != result {
         seg := fmt.Sprintf("HIRMS:%d:2+9931:%s:Invalid Login'", len(responseSegments)+2, segHead[1])
         responseSegments = append(responseSegments, seg)
       } else {
@@ -134,7 +154,7 @@ func MakeResponseMessage(message string) (string, error) {
 
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func hbciHandler(w http.ResponseWriter, r *http.Request) {
   message, _ := ioutil.ReadAll(r.Body)
   decodedBytes, err := base64.StdEncoding.DecodeString(string(message))
   if err != nil {
@@ -147,11 +167,41 @@ func handler(w http.ResponseWriter, r *http.Request) {
   fmt.Fprintf(w,"%s", base64.StdEncoding.EncodeToString([]byte(response)))
 }
 
+func userHandler(w http.ResponseWriter, r *http.Request) {
+  r.ParseForm()
+  glog.Infof("Test: %s", r.PostFormValue("login_id"))
+  glog.Infof("FORM: %v", r.Form)
+
+  loginId := r.PostFormValue("login_id")
+  pin := r.PostFormValue("pin")
+
+  c, err := redis.DialTimeout("tcp", "127.0.0.1:6379", time.Duration(10)*time.Second)
+  if err != nil {
+    glog.Fatalf("Cannot connect to redis: %s", err)
+    fmt.Fprintf(w, "Failed to connect to persistence backend")
+    return
+  }
+
+  c.Cmd("select", 0)
+
+  glog.Infof("Storing new user: %s (PIN=%s)", loginId, pin)
+
+  result := c.Cmd("set", loginId, pin)
+  if result.Err != nil {
+    glog.Errorf("Cannot save to redis: %s", result.Err)
+    fmt.Fprintf(w, "Failed to save to persistence backend")
+    return
+  }
+
+  fmt.Fprintf(w, "OK")
+}
+
 func main() {
   addr := flag.String("addr", ":8080", "Host & Port the HTTPS server will listen on (defaults to :8080)")
 
   flag.Parse() // glog needs this for the loglevels!
   glog.Infof("Server starting...")
-  http.HandleFunc("/", handler)
+  http.HandleFunc("/hbci", hbciHandler)
+  http.HandleFunc("/users", userHandler)
   http.ListenAndServeTLS(*addr, "server.crt", "server.key", nil)
 }
