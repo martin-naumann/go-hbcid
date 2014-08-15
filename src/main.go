@@ -148,8 +148,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+  addr := flag.String("addr", ":8080", "Host & Port the HTTPS server will listen on (defaults to :8080)")
+
   flag.Parse() // glog needs this for the loglevels!
   glog.Infof("Server starting...")
   http.HandleFunc("/", handler)
-  http.ListenAndServeTLS(":443", "server.crt", "server.key", nil)
+  http.ListenAndServeTLS(*addr, "server.crt", "server.key", nil)
 }
