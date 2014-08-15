@@ -43,7 +43,7 @@ doc:
 clean:
 	rm build/*
 
-deps: github.com/stretchr/testify github.com/golang/glog github.com/dchest/uniuri
+deps: github.com/stretchr/testify github.com/golang/glog github.com/dchest/uniuri github.com/fzzy/radix/redis
 
 github.com/stretchr/testify:
 	go get github.com/stretchr/testify
@@ -56,3 +56,6 @@ github.com/golang/lint:
 
 github.com/dchest/uniuri:
 	go get github.com/dchest/uniuri
+
+github.com/fzzy/radix/redis:
+	go get github.com/fzzy/radix/redis
