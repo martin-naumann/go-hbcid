@@ -11,6 +11,7 @@ setup: deps
 update:
 	@echo Updating dependencies
 	go get github.com/golang/glog
+	go get github.com/golang/lint
 	go get github.com/stretchr/testify
 	go get github.com/dchest/uniuri
 
@@ -30,8 +31,8 @@ test: deps
 coverage:
 	@echo Coverage not implemented
 
-lint:
-	gofmt src/...
+lint: github.com/golang/lint
+	$(GOPATH)/bin/golint src
 
 loc:
 	cloc src/
@@ -49,6 +50,9 @@ github.com/stretchr/testify:
 
 github.com/golang/glog:
 	go get github.com/golang/glog
+
+github.com/golang/lint:
+	go get github.com/golang/lint
 
 github.com/dchest/uniuri:
 	go get github.com/dchest/uniuri
