@@ -1,5 +1,5 @@
 sudo apt-get -y update
-sudo apt-get install -y git mercurial
+sudo apt-get install -y git mercurial ruby1.9.1-dev
 
 wget https://go.googlecode.com/files/go1.2.linux-amd64.tar.gz
 tar xvf go1.2.linux-amd64.tar.gz
@@ -11,3 +11,5 @@ sudo ln -s /opt/go/bin/godoc /usr/local/bin/godoc
 
 sudo echo "export GOROOT=/opt/go" >> /etc/profile
 sudo echo "export GOPATH=~/go" >> /etc/profile
+
+sudo gem install --no-rdoc --no-ri fpm
