@@ -1,5 +1,5 @@
 sudo apt-get -y update
-sudo apt-get install -y git mercurial ruby1.9.1-dev
+sudo apt-get install -y git mercurial ruby1.9.1-dev redis-server
 
 wget https://go.googlecode.com/files/go1.2.linux-amd64.tar.gz
 tar xvf go1.2.linux-amd64.tar.gz
