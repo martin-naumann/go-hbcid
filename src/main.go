@@ -3,16 +3,15 @@ package main
 import (
   "fmt"
   "flag"
-  "time"
   "./hbci"
   "strconv"
   "strings"
   "net/http"
   "io/ioutil"
+  "./persistence"
   "encoding/base64"
   "github.com/golang/glog"
   "github.com/dchest/uniuri"
-  "github.com/fzzy/radix/redis"
 )
 
 type MessageContext struct {
@@ -107,17 +106,7 @@ func ParseIncomingMessage(message string) (MessageContext, error) {
       msgContext.Pin = dataElems[3]
       glog.Infof("Signed with PIN %s", msgContext.Pin)
 
-      c, err := redis.DialTimeout("tcp", "127.0.0.1:6379", time.Duration(10)*time.Second)
-      if err != nil {
-        glog.Fatalf("(Auth) Cannot connect to redis: %s", err)
-        seg := fmt.Sprintf("HIRMG:%d:2+9050::Can not connect to persistence backend'", len(responseSegments)+2)
-        responseSegments = append(responseSegments, seg)
-        break
-      }
-
-      c.Cmd("select", 0)
-
-      result, err := c.Cmd("get", msgContext.UserId).Str()
+      result, err := persistence.Load(msgContext.UserId)
       if err != nil {
         glog.Warningf("(Auth) Cannot read from redis: %s", err)
         seg := fmt.Sprintf("HIRMS:%d:2+9931:%s:Invalid Login'", len(responseSegments)+2, segHead[1])
@@ -126,11 +115,13 @@ func ParseIncomingMessage(message string) (MessageContext, error) {
       }
 
       if msgContext.Pin != result {
+        glog.Warningf("Invalid login detected")
         seg := fmt.Sprintf("HIRMS:%d:2+9931:%s:Invalid Login'", len(responseSegments)+2, segHead[1])
         responseSegments = append(responseSegments, seg)
       } else {
         seg := fmt.Sprintf("HIRMG:%d:2+0000::OHAI :)'", len(responseSegments)+2)
         responseSegments = append(responseSegments, seg)
+        glog.Infof("Initialisation successful")
       }
       break
     }
@@ -173,20 +164,11 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
   loginId := r.PostFormValue("login_id")
   pin := r.PostFormValue("pin")
 
-  c, err := redis.DialTimeout("tcp", "127.0.0.1:6379", time.Duration(10)*time.Second)
-  if err != nil {
-    glog.Fatalf("Cannot connect to redis: %s", err)
-    fmt.Fprintf(w, "Failed to connect to persistence backend")
-    return
-  }
-
-  c.Cmd("select", 0)
-
   glog.Infof("Storing new user: %s (PIN=%s)", loginId, pin)
 
-  result := c.Cmd("set", loginId, pin)
-  if result.Err != nil {
-    glog.Errorf("Cannot save to redis: %s", result.Err)
+  err := persistence.Save(loginId, pin)
+  if err != nil {
+    glog.Errorf("Cannot save to redis: %s", err)
     fmt.Fprintf(w, "Failed to save to persistence backend")
     return
   }
