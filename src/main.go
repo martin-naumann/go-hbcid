@@ -169,8 +169,6 @@ func hbciHandler(w http.ResponseWriter, r *http.Request) {
 
 func userHandler(w http.ResponseWriter, r *http.Request) {
   r.ParseForm()
-  glog.Infof("Test: %s", r.PostFormValue("login_id"))
-  glog.Infof("FORM: %v", r.Form)
 
   loginId := r.PostFormValue("login_id")
   pin := r.PostFormValue("pin")
